@@ -61,6 +61,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text
 .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
 .btn{padding:12px 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans TC',sans-serif;font-size:.85rem;font-weight:500;transition:all .2s;flex:1;min-width:120px}
 .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent2);transform:translateY(-1px)}
+.btn-line{background:#06C755;color:#fff}.btn-line:hover{background:#05b04c;transform:translateY(-1px)}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2)}.btn-outline:hover{border-color:var(--text2);color:var(--text)}
 .btn-danger{background:transparent;border:1px solid rgba(255,107,107,.3);color:var(--red)}.btn-danger:hover{background:rgba(255,107,107,.1)}
 
@@ -159,6 +160,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text
   <!-- Actions -->
   <div class="actions">
     <button class="btn btn-primary" onclick="saveRecord()">✓ 確認存檔，結算本期</button>
+    <button class="btn btn-line" onclick="copyForLine()">💬 複製 LINE 格式</button>
     <button class="btn btn-outline" onclick="exportJSON()">⬇ 匯出 JSON 備份</button>
     <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">⬆ 匯入 JSON</button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
@@ -370,6 +372,65 @@ function showToast(msg, bg){
   const t = document.getElementById('toast');
   t.textContent = msg; t.style.background = bg||'var(--green)';
   t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400);
+}
+
+// --- 複製 LINE 格式 ---
+function copyForLine(){
+  // 優先用目前畫面上正在計算的資料，若沒有則取最近一筆歷史
+  const bill = parseFloat(document.getElementById('totalBill').value) || 0;
+  const last = getLastReadings();
+  let hasInput = bill > 0;
+  let lines = [];
+
+  if(hasInput){
+    // 從目前輸入產生
+    let total = 0;
+    const rows = [];
+    METERS.forEach(m => {
+      const cur = parseFloat(document.getElementById('val_'+m).value);
+      const prev = last[m] !== undefined ? parseFloat(last[m]) : NaN;
+      let usage = 0;
+      if(!isNaN(cur)) usage = !isNaN(prev) ? Math.max(cur - prev, 0) : cur;
+      total += usage;
+      rows.push({m, prev:!isNaN(prev)?prev:'-', cur:isNaN(cur)?'-':cur, usage});
+    });
+    const unit = total > 0 ? bill / total : 0;
+    const now = new Date();
+    const period = now.getFullYear()+'/'+String(now.getMonth()+1).padStart(2,'0');
+    lines.push('⚡ '+period+' 電費分攤（總額 '+bill.toLocaleString()+' 元）');
+    lines.push('━━━━━━━━━━━━━━━━━');
+    rows.forEach(r => {
+      const cost = total > 0 ? Math.round(r.usage * unit) : 0;
+      lines.push(r.m+'('+POS[r.m]+') '+r.prev+'→'+r.cur+' '+r.usage+'度 '+cost+'元');
+    });
+    lines.push('━━━━━━━━━━━━━━━━━');
+    lines.push('合計 '+total+'度 ｜ 每度 '+unit.toFixed(2)+'元');
+  } else {
+    // 取最近一筆歷史
+    const hist = getHistory();
+    if(!hist.length){ showToast('尚無資料可複製','var(--amber)'); return; }
+    const r = hist[0];
+    lines.push('⚡ '+r.date+' 電費分攤（總額 '+r.bill.toLocaleString()+' 元）');
+    lines.push('━━━━━━━━━━━━━━━━━');
+    METERS.forEach(m => {
+      const d = r.details[m];
+      lines.push(m+'('+POS[m]+') '+(d.prev!==null?d.prev:'-')+'→'+d.reading+' '+d.usage+'度 '+d.cost+'元');
+    });
+    lines.push('━━━━━━━━━━━━━━━━━');
+    lines.push('合計 '+r.total+'度 ｜ 每度 '+r.unit.toFixed(2)+'元');
+  }
+
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(()=>{
+    showToast('✓ 已複製！直接貼到 LINE 即可','#06C755');
+  }).catch(()=>{
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('✓ 已複製！直接貼到 LINE 即可','#06C755');
+  });
 }
 
 // --- 匯出 JSON ---
