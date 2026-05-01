@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每月電費分攤計算器</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f1117;--card:#1a1d27;--card2:#222533;--border:#2e3148;
+  --text:#e4e6f0;--text2:#9499b3;--text3:#5d6283;
+  --accent:#6c5ce7;--accent2:#a29bfe;--accent-glow:rgba(108,92,231,.15);
+  --red:#ff6b6b;--green:#51cf66;--amber:#fcc419;
+  --meter-a:#ff6b6b;--meter-b:#ffa94d;--meter-c:#fcc419;--meter-d:#51cf66;--meter-e:#74c0fc;
+}
+body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
+.app{max-width:680px;margin:0 auto}
+
+/* Header */
+.header{text-align:center;margin-bottom:32px;position:relative}
+.header h1{font-size:1.6rem;font-weight:900;letter-spacing:-.02em;
+  background:linear-gradient(135deg,var(--accent2),var(--accent),#fd79a8);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header p{color:var(--text2);font-size:.85rem;margin-top:6px}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:16px;
+  transition:border-color .2s}
+.card:hover{border-color:var(--accent)}
+.card-title{font-size:.8rem;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px;
+  display:flex;align-items:center;gap:8px}
+.card-title span{font-size:1rem}
+
+/* Bill Input */
+.bill-input-wrap{position:relative}
+.bill-input{width:100%;background:var(--card2);border:2px solid var(--border);border-radius:12px;padding:16px 20px;
+  font-size:2rem;font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--accent2);text-align:right;
+  outline:none;transition:border-color .2s;-moz-appearance:textfield}
+.bill-input::-webkit-outer-spin-button,.bill-input::-webkit-inner-spin-button{-webkit-appearance:none}
+.bill-input:focus{border-color:var(--accent)}
+.bill-suffix{position:absolute;right:20px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:1rem;pointer-events:none}
+
+/* Meter Grid */
+.meter-grid{display:flex;flex-direction:column;gap:10px}
+.meter-row{display:grid;grid-template-columns:42px 1fr 80px 100px;align-items:center;gap:12px;
+  background:var(--card2);border-radius:12px;padding:12px 16px;border:1px solid transparent;transition:all .2s}
+.meter-row:hover{border-color:var(--border)}
+.meter-label{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:.9rem;color:#fff;flex-shrink:0}
+.meter-label.a{background:var(--meter-a)}
+.meter-label.b{background:var(--meter-b)}
+.meter-label.c{background:var(--meter-c)}
+.meter-label.d{background:var(--meter-d)}
+.meter-label.e{background:var(--meter-e)}
+.meter-input{width:100%;background:transparent;border:none;border-bottom:2px solid var(--border);padding:8px 4px;
+  font-family:'JetBrains Mono',monospace;font-size:1.1rem;color:var(--text);outline:none;transition:border-color .2s;
+  -moz-appearance:textfield}
+.meter-input::-webkit-outer-spin-button,.meter-input::-webkit-inner-spin-button{-webkit-appearance:none}
+.meter-input:focus{border-bottom-color:var(--accent)}
+.meter-input::placeholder{color:var(--text3);font-size:.85rem}
+.meter-usage{font-family:'JetBrains Mono',monospace;font-size:.9rem;color:var(--text2);text-align:right}
+.meter-usage .val{color:var(--green);font-weight:600}
+.meter-cost{font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:600;color:var(--red);text-align:right}
+.meter-prev{font-size:.7rem;color:var(--text3);margin-top:2px}
+
+/* Summary Bar */
+.summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px}
+.summary-item{text-align:center;padding:14px 8px;background:var(--card2);border-radius:12px}
+.summary-item .label{font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
+.summary-item .value{font-family:'JetBrains Mono',monospace;font-size:1.3rem;font-weight:600;margin-top:4px;color:var(--accent2)}
+
+/* Actions */
+.actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.btn{padding:12px 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans TC',sans-serif;
+  font-size:.85rem;font-weight:500;transition:all .2s;flex:1;min-width:120px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2);transform:translateY(-1px)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.btn-outline:hover{border-color:var(--text2);color:var(--text)}
+.btn-danger{background:transparent;border:1px solid rgba(255,107,107,.3);color:var(--red)}
+.btn-danger:hover{background:rgba(255,107,107,.1)}
+
+/* History */
+.history-section{margin-top:8px}
+.history-toggle{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:14px 20px;
+  color:var(--text2);font-size:.85rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+  font-family:'Noto Sans TC',sans-serif;transition:all .2s}
+.history-toggle:hover{border-color:var(--accent);color:var(--text)}
+.history-list{max-height:0;overflow:hidden;transition:max-height .4s ease}
+.history-list.open{max-height:2000px}
+.history-entry{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:8px;
+  animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.history-entry .h-date{font-size:.8rem;color:var(--accent2);font-weight:600;margin-bottom:8px}
+.history-entry .h-row{display:flex;justify-content:space-between;padding:4px 0;font-size:.82rem;border-bottom:1px solid var(--border)}
+.history-entry .h-row:last-child{border:none}
+.history-entry .h-meter{font-weight:600}
+.history-entry .h-cost{color:var(--red);font-family:'JetBrains Mono',monospace;font-weight:600}
+.history-entry .h-total{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:.8rem;color:var(--text2);
+  display:flex;justify-content:space-between}
+
+/* Column Headers */
+.col-headers{display:grid;grid-template-columns:42px 1fr 80px 100px;gap:12px;padding:0 16px;margin-bottom:6px}
+.col-headers span{font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
+.col-headers span:nth-child(3),.col-headers span:nth-child(4){text-align:right}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--green);color:#000;padding:12px 24px;border-radius:10px;font-size:.85rem;font-weight:600;
+  opacity:0;transition:all .4s ease;pointer-events:none;z-index:100}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* Responsive */
+@media(max-width:480px){
+  .meter-row{grid-template-columns:36px 1fr 60px 80px;gap:8px;padding:10px 12px}
+  .bill-input{font-size:1.5rem}
+  .summary{grid-template-columns:1fr}
+  .col-headers{grid-template-columns:36px 1fr 60px 80px;gap:8px;padding:0 12px}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <h1>⚡ 每月電費分攤</h1>
+    <p>輸入帳單金額與各電表度數，自動計算分攤費用</p>
+  </div>
+
+  <!-- Bill Amount -->
+  <div class="card">
+    <div class="card-title"><span>💰</span> 本期帳單</div>
+    <div class="bill-input-wrap">
+      <input type="number" class="bill-input" id="totalBill" placeholder="0" oninput="calc()">
+    </div>
+  </div>
+
+  <!-- Meter Readings -->
+  <div class="card">
+    <div class="card-title"><span>📊</span> 各電表抄表度數</div>
+    <div class="col-headers">
+      <span>電表</span><span>本期度數</span><span>用量</span><span>分攤</span>
+    </div>
+    <div class="meter-grid" id="meterGrid"></div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary">
+    <div class="summary-item">
+      <div class="label">總用量</div>
+      <div class="value" id="sumUsage">0 度</div>
+    </div>
+    <div class="summary-item">
+      <div class="label">每度單價</div>
+      <div class="value" id="unitPrice">0 元</div>
+    </div>
+    <div class="summary-item">
+      <div class="label">分攤合計</div>
+      <div class="value" id="sumCost">0 元</div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions">
+    <button class="btn btn-primary" onclick="saveRecord()">✓ 確認存檔，結算本期</button>
+    <button class="btn btn-danger" onclick="clearAll()">清空全部紀錄</button>
+  </div>
+
+  <!-- History -->
+  <div class="card history-section">
+    <button class="history-toggle" onclick="toggleHistory()">
+      <span>📋 歷史紀錄</span>
+      <span id="histArrow">▼</span>
+    </button>
+    <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const METERS = ['A','B','C','D','E'];
+const COLORS = {A:'a',B:'b',C:'c',D:'d',E:'e'};
+
+// --- Storage helpers ---
+function getLastReadings(){
+  try{ return JSON.parse(localStorage.getItem('elec_last') || '{}') } catch{ return {} }
+}
+function setLastReadings(obj){ localStorage.setItem('elec_last', JSON.stringify(obj)) }
+function getHistory(){
+  try{ return JSON.parse(localStorage.getItem('elec_history') || '[]') } catch{ return [] }
+}
+function setHistory(arr){ localStorage.setItem('elec_history', JSON.stringify(arr)) }
+
+// --- Init ---
+function init(){
+  const grid = document.getElementById('meterGrid');
+  const last = getLastReadings();
+  grid.innerHTML = '';
+  METERS.forEach(m => {
+    const prev = last[m] ?? '';
+    const div = document.createElement('div');
+    div.className = 'meter-row';
+    div.innerHTML = `
+      <div class="meter-label ${COLORS[m]}">${m}</div>
+      <div>
+        <input type="number" class="meter-input" id="val_${m}" placeholder="輸入度數" oninput="calc()">
+        <div class="meter-prev">上期：${prev !== '' ? prev : '—'}</div>
+      </div>
+      <div class="meter-usage" id="usage_${m}"><span class="val">0</span> 度</div>
+      <div class="meter-cost" id="cost_${m}">0 元</div>
+    `;
+    grid.appendChild(div);
+  });
+  renderHistory();
+}
+
+// --- Calculate ---
+function calc(){
+  const bill = parseFloat(document.getElementById('totalBill').value) || 0;
+  const last = getLastReadings();
+  let total = 0;
+  const usages = {};
+
+  METERS.forEach(m => {
+    const cur = parseFloat(document.getElementById('val_'+m).value);
+    const prev = last[m] !== undefined ? parseFloat(last[m]) : NaN;
+    let usage = 0;
+    if(!isNaN(cur)){
+      if(!isNaN(prev)){
+        usage = cur - prev;
+        if(usage < 0) usage = 0;
+      } else {
+        // 首次使用，無上期資料，可直接填寫用量
+        usage = cur;
+      }
+    }
+    usages[m] = usage;
+    total += usage;
+    document.getElementById('usage_'+m).innerHTML = `<span class="val">${usage}</span> 度`;
+  });
+
+  document.getElementById('sumUsage').textContent = total + ' 度';
+
+  let costSum = 0;
+  if(total > 0 && bill > 0){
+    const unit = bill / total;
+    document.getElementById('unitPrice').textContent = unit.toFixed(2) + ' 元';
+    METERS.forEach(m => {
+      const share = Math.round(usages[m] * unit);
+      costSum += share;
+      document.getElementById('cost_'+m).textContent = share + ' 元';
+    });
+  } else {
+    document.getElementById('unitPrice').textContent = '0 元';
+    METERS.forEach(m => document.getElementById('cost_'+m).textContent = '0 元');
+  }
+  document.getElementById('sumCost').textContent = costSum + ' 元';
+}
+
+// --- Save ---
+function saveRecord(){
+  const bill = parseFloat(document.getElementById('totalBill').value) || 0;
+  if(bill <= 0){ showToast('請先輸入帳單金額','var(--amber)'); return }
+
+  const last = getLastReadings();
+  const newLast = {};
+  const details = {};
+  let total = 0;
+  let allFilled = true;
+
+  METERS.forEach(m => {
+    const cur = parseFloat(document.getElementById('val_'+m).value);
+    if(isNaN(cur)){ allFilled = false; return }
+    const prev = last[m] !== undefined ? parseFloat(last[m]) : NaN;
+    let usage = !isNaN(prev) ? Math.max(cur - prev, 0) : cur;
+    total += usage;
+    newLast[m] = cur;
+    details[m] = { reading: cur, prev: !isNaN(prev) ? prev : null, usage };
+  });
+
+  if(!allFilled){ showToast('請填寫所有電表度數','var(--amber)'); return }
+  if(total <= 0){ showToast('使用度數為零，請確認','var(--amber)'); return }
+
+  const unit = bill / total;
+  METERS.forEach(m => { details[m].cost = Math.round(details[m].usage * unit) });
+
+  const record = {
+    date: new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'}),
+    bill, total, unit: +unit.toFixed(4), details
+  };
+
+  const hist = getHistory();
+  hist.unshift(record);
+  setHistory(hist);
+  setLastReadings(newLast);
+
+  showToast('✓ 已存檔！下次輸入新度數即可計算','var(--green)');
+
+  // Reset inputs for next month
+  METERS.forEach(m => document.getElementById('val_'+m).value = '');
+  document.getElementById('totalBill').value = '';
+  init();
+}
+
+// --- History ---
+let histOpen = false;
+function toggleHistory(){
+  histOpen = !histOpen;
+  document.getElementById('historyList').classList.toggle('open', histOpen);
+  document.getElementById('histArrow').textContent = histOpen ? '▲' : '▼';
+}
+
+function renderHistory(){
+  const hist = getHistory();
+  const el = document.getElementById('historyList');
+  if(hist.length === 0){ el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:.85rem">尚無歷史紀錄</div>'; return }
+
+  el.innerHTML = hist.map((r,i) => {
+    const rows = METERS.map(m => {
+      const d = r.details[m];
+      return `<div class="h-row">
+        <span class="h-meter">${m}</span>
+        <span>${d.prev !== null ? d.prev+'→'+d.reading : d.reading} (${d.usage}度)</span>
+        <span class="h-cost">${d.cost} 元</span>
+      </div>`;
+    }).join('');
+    return `<div class="history-entry">
+      <div class="h-date">${r.date}　帳單 ${r.bill} 元</div>
+      ${rows}
+      <div class="h-total">
+        <span>總用量 ${r.total} 度</span>
+        <span>每度 ${r.unit} 元</span>
+      </div>
+      <button class="btn btn-outline" style="margin-top:8px;flex:none;min-width:auto;padding:6px 12px;font-size:.75rem"
+        onclick="deleteRecord(${i})">刪除此筆</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteRecord(idx){
+  if(!confirm('確定刪除此筆紀錄？')) return;
+  const hist = getHistory();
+  hist.splice(idx, 1);
+  setHistory(hist);
+  renderHistory();
+  showToast('已刪除','var(--text2)');
+}
+
+function clearAll(){
+  if(!confirm('確定清空所有紀錄與上期度數？此操作無法復原。')) return;
+  localStorage.removeItem('elec_last');
+  localStorage.removeItem('elec_history');
+  document.getElementById('totalBill').value = '';
+  init();
+  showToast('已清空所有資料','var(--text2)');
+}
+
+// --- Toast ---
+function showToast(msg, bg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = bg || 'var(--green)';
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 2400);
+}
+
+init();
+</script>
+</body>
+</html>
